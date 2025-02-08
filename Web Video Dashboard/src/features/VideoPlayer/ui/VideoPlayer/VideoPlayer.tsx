@@ -1,6 +1,7 @@
 import ReactPlayer from "react-player";
-import { BellIcon, TimeIcon } from "@chakra-ui/icons";
+import { captureVideoFrame } from "capture-video-frame";
 
+import { BellIcon, DownloadIcon, TimeIcon } from "@chakra-ui/icons";
 import {
   Slider,
   SliderTrack,
@@ -12,13 +13,24 @@ import {
   Text,
   Input,
   Button,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
 } from "@chakra-ui/react";
+
 import { MdGraphicEq } from "react-icons/md";
 import { useRef, useState } from "react";
 import { PlayerProgress } from "../../model/types/PlayerProgress";
 import { secondsToTime } from "../../lib/secondsToTime";
 import { PauseIcon } from "../../../../shared/components/PauseIcon";
 import { PlayIcon } from "../../../../shared/components/PlayIcon";
+import { VideoFrame, VideoFrameFormat } from "../../model/types/VideoFrame";
+import { downloadScreenshot } from "../../lib/downloadScreenshot";
+
+//Документация React Player https://www.npmjs.com/package/react-player
+//Документация capture-video-frame https://www.npmjs.com/package/capture-video-frame
+//Документация Chakra UI v2 https://v2.chakra-ui.com/
 
 //ЗАХВАТ СКРИНШОТА
 // https://github.com/CookPete/react-player/issues/341
@@ -50,6 +62,8 @@ export const VideoPlayer = () => {
   const [playbackRateTooltip, setPlaybackRateTooltip] = useState(false); //Отображение текущих значений при наведении на слайдеры
 
   const [playing, setPlaying] = useState<boolean>(false); // Воспроизведение/пауза
+
+  const videoFrame = useRef<VideoFrame | boolean>(false);
   //Меняем громкость
   const onChangeVolume = (val: number) => {
     setVolume(val);
@@ -75,6 +89,28 @@ export const VideoPlayer = () => {
 
   const onPause = () => {
     setPlaying((prev) => !prev);
+  };
+
+  //Загружаем картинку по клику. Инициируем ссылку, нажатие на неё и загрузку.
+  const onTakeScreenshot = async (format: VideoFrameFormat) => {
+    //Получаем изображение с помощью библиотеки capture-video-frame
+    if (player.current !== null) {
+      videoFrame.current = await captureVideoFrame(
+        player.current.getInternalPlayer(),
+        format,
+        1
+      );
+
+      //Сохраняем
+
+      if (typeof videoFrame.current != "boolean") {
+        downloadScreenshot(videoFrame.current.blob);
+      }
+      //captureVideoFrame возвращает false, если не сработает
+      else {
+        throw new Error("captureVideoFrame не смог захватить изображение");
+      }
+    }
   };
 
   //cb плеера, вызывается на получении видео, возвращает длительность видео
@@ -123,8 +159,14 @@ export const VideoPlayer = () => {
         onDuration={onDuration}
         onStart={onStart}
         progressInterval={1000 / playbackRate}
-        //url={"https://www.youtube.com/watch?v=cI5V_8RErzI"}
         url={videoFilePath}
+        config={{
+          file: {
+            attributes: {
+              crossOrigin: "anonymous",
+            },
+          },
+        }}
       />
       <Box p={4} pt={6}>
         <Text>{`${timeLabel(played)} из ${durationFormatted}`}</Text>
@@ -207,10 +249,32 @@ export const VideoPlayer = () => {
           </Slider>
         </HStack>
 
-        <HStack>
+        <HStack mt="30px" gap="10px">
           <Button onClick={onPause}>
             {playing ? <PauseIcon /> : <PlayIcon />}
           </Button>
+
+          <Menu>
+            <MenuButton as={Button}>
+              <DownloadIcon />
+            </MenuButton>
+            <MenuList>
+              <MenuItem
+                onClick={() => {
+                  onTakeScreenshot(VideoFrameFormat.jpg);
+                }}
+              >
+                {VideoFrameFormat.jpg}
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  onTakeScreenshot(VideoFrameFormat.png);
+                }}
+              >
+                {VideoFrameFormat.png}
+              </MenuItem>
+            </MenuList>
+          </Menu>
         </HStack>
       </Box>
     </>
