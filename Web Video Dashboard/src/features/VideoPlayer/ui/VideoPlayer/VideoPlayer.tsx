@@ -1,6 +1,9 @@
 import ReactPlayer from "react-player";
 import { captureVideoFrame } from "capture-video-frame";
 
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile } from "@ffmpeg/util";
+
 import { BellIcon, DownloadIcon, TimeIcon } from "@chakra-ui/icons";
 import {
   Slider,
@@ -20,30 +23,61 @@ import {
 } from "@chakra-ui/react";
 
 import { MdGraphicEq } from "react-icons/md";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PlayerProgress } from "../../model/types/PlayerProgress";
 import { secondsToTime } from "../../lib/secondsToTime";
 import { PauseIcon } from "../../../../shared/components/PauseIcon";
 import { PlayIcon } from "../../../../shared/components/PlayIcon";
 import { VideoFrame, VideoFrameFormat } from "../../model/types/VideoFrame";
-import { downloadScreenshot } from "../../lib/downloadScreenshot";
+import { downloadBlob } from "../../lib/downloadBlob";
+import { convertVideo } from "../../lib/convertVideo";
+import { ffmpegLoad } from "../../lib/ffmpegLoad";
 
 //Документация React Player https://www.npmjs.com/package/react-player
 //Документация capture-video-frame https://www.npmjs.com/package/capture-video-frame
 //Документация Chakra UI v2 https://v2.chakra-ui.com/
+//ffmpeg.wasm https://github.com/ffmpegwasm/ffmpeg.wasm
+
+//FFMPEG на Vite не работает без правки конфига Vite https://github.com/ffmpegwasm/ffmpeg.wasm/issues/532#issuecomment-1676237863
 
 //ЗАХВАТ СКРИНШОТА
 // https://github.com/CookPete/react-player/issues/341
 
 export const VideoPlayer = () => {
-  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  //~~~~~~~~~~~~~Создадим путь~~~~~~~~~~~~~~~~~~~~~~~~
-  //https://stackoverflow.com/questions/60794257/react-js-react-player-how-to-play-local-video
+  //Инициируем FFMPEG
+  useEffect(() => {
+    const loadConverter = async () => {
+      const isLoad = await ffmpegLoad(ffmpegRef.current);
+      console.log(isLoad);
+      if (isLoad) {
+        setConverterLoaded(isLoad);
+      } else {
+        //Обрабатываем
+      }
+    };
+    loadConverter();
+  }, []);
+
   const [videoFilePath, setVideoFilePath] = useState<string>("");
-  const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files)
+  const handleVideoUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (event.target.files) {
       setVideoFilePath(URL.createObjectURL(event.target.files[0]));
+
+      //Конвертирование и загрузка в формате
+      const [ref, name, file] = [
+        ffmpegRef.current,
+        event.target.files[0].name,
+        event.target.files[0],
+      ];
+      const data = await convertVideo(ref, file, name, "output");
+      downloadBlob(new Blob([data.buffer], { type: "video/mp4" }));
+    }
   };
+
+  const [converterLoaded, setConverterLoaded] = useState<boolean>(false); //флаг загрузки ffmpeg
+  const ffmpegRef = useRef(new FFmpeg());
 
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -53,9 +87,10 @@ export const VideoPlayer = () => {
   const [playbackRate, setPlaybackRate] = useState<number>(1); //Скорость воспроизведения
   const [played, setPlayed] = useState<number>(0); //Место проигрывания сейчас
 
-  const [duration, setDuration] = useState<number>(0);
-  const [durationFormatted, setDurationFormatted] = useState<string>(""); //Визуальное отображение длительности видео
+  const [duration, setDuration] = useState<number>(0); //Длительность видео в секундах
+  const [durationFormatted, setDurationFormatted] = useState<string>(""); //Визуальное отображение длительности видео (Формат MM:SS)
 
+  //Стартовая точка для слайдера воспроизведения видео. Мы обрезаем видео на пяти минутах, поэтому она нужна.
   const [startPlaybackPoint, setStartPlaybactPoint] = useState<number>(0);
 
   const [volumeTooltip, setVolumeTooltip] = useState(false); //Отображение текущих значений при наведении на слайдеры
@@ -63,7 +98,9 @@ export const VideoPlayer = () => {
 
   const [playing, setPlaying] = useState<boolean>(false); // Воспроизведение/пауза
 
-  const videoFrame = useRef<VideoFrame | boolean>(false);
+  const videoFrame = useRef<VideoFrame | boolean>(false); // Реф для захвата картинки для скриншотов
+
+  const downloadMessage = useRef<string>("");
   //Меняем громкость
   const onChangeVolume = (val: number) => {
     setVolume(val);
@@ -100,11 +137,9 @@ export const VideoPlayer = () => {
         format,
         1
       );
-
       //Сохраняем
-
       if (typeof videoFrame.current != "boolean") {
-        downloadScreenshot(videoFrame.current.blob);
+        downloadBlob(videoFrame.current.blob);
       }
       //captureVideoFrame возвращает false, если не сработает
       else {
@@ -115,7 +150,6 @@ export const VideoPlayer = () => {
 
   //cb плеера, вызывается на получении видео, возвращает длительность видео
   const onDuration = (val: number) => {
-    console.log("Длительность " + val);
     //Если длительность видео боьше 5 минут, обрезаем начало и переносим произведение на 5 минут.
     if (val > 300) {
       console.log("duration > 300");
@@ -123,27 +157,27 @@ export const VideoPlayer = () => {
       setStartPlaybactPoint(startPoint);
       setPlayed(startPoint);
     }
-
     setDuration(val);
     setDurationFormatted(secondsToTime(val));
     setPlaying(true);
   };
+  //cb плеера вызывается, когда начинает играть медиа
   const onStart = () => {
     if (player.current) player.current.seekTo(duration - 300, "seconds");
   };
 
-  //cb плеера, вызывается раз в секунду, возвращает объект с данными проигрывания и загрузки видео
+  //cb плеера, вызывается по интервалу, возвращает объект с данными проигрывания и загрузки видео
   const onProgress = (obj: PlayerProgress) => {
     setPlayed(obj.playedSeconds);
   };
 
-  //Запихать его в отдельный компонент,
-  const timeLabel = (value: number) => {
-    const minutes = Math.floor(value / 60);
-    const seconds = Math.floor(value - minutes * 60);
-    if (seconds < 10) return `${minutes}:0${seconds}`;
-    return `${minutes}:${seconds}`;
-  };
+  const ffmpeg = ffmpegRef.current;
+  // Listen to progress event instead of log.
+  ffmpeg.on("progress", ({ progress, time }) => {
+    downloadMessage.current = `${progress * 100} % (transcoded time: ${
+      time / 1000000
+    } s)`;
+  });
 
   return (
     <>
@@ -169,7 +203,7 @@ export const VideoPlayer = () => {
         }}
       />
       <Box p={4} pt={6}>
-        <Text>{`${timeLabel(played)} из ${durationFormatted}`}</Text>
+        <Text>{`${secondsToTime(played)} из ${durationFormatted}`}</Text>
         <Slider
           mb="40px"
           aria-label="slider-ex-4"
@@ -195,7 +229,7 @@ export const VideoPlayer = () => {
             min={0}
             step={0.01}
             aria-label="slider-ex-4"
-            defaultValue={30}
+            defaultValue={1}
             onChange={onChangeVolume}
             onMouseEnter={() => setVolumeTooltip(true)}
             onMouseLeave={() => setVolumeTooltip(false)}
@@ -222,7 +256,7 @@ export const VideoPlayer = () => {
           <TimeIcon />
           <Slider
             max={2}
-            min={0.25}
+            min={0.2}
             step={0.01}
             aria-label="slider-ex-4"
             defaultValue={1}
@@ -253,29 +287,36 @@ export const VideoPlayer = () => {
           <Button onClick={onPause}>
             {playing ? <PauseIcon /> : <PlayIcon />}
           </Button>
+          {playing ? null : (
+            <Menu>
+              <MenuButton as={Button}>
+                <DownloadIcon />
+              </MenuButton>
+              <MenuList>
+                {Object.entries(VideoFrameFormat).map(([key, value]) => (
+                  <MenuItem
+                    onClick={() => {
+                      onTakeScreenshot(value);
+                    }}
+                  >
+                    {key}
+                  </MenuItem>
+                ))}
+              </MenuList>
+            </Menu>
+          )}
 
-          <Menu>
-            <MenuButton as={Button}>
-              <DownloadIcon />
-            </MenuButton>
-            <MenuList>
-              <MenuItem
-                onClick={() => {
-                  onTakeScreenshot(VideoFrameFormat.jpg);
-                }}
-              >
-                {VideoFrameFormat.jpg}
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  onTakeScreenshot(VideoFrameFormat.png);
-                }}
-              >
-                {VideoFrameFormat.png}
-              </MenuItem>
-            </MenuList>
-          </Menu>
+          {converterLoaded ? (
+            <Menu>
+              <MenuButton as={Button}>Конвертировать и скачать</MenuButton>
+              <MenuList>
+                <MenuItem>MP4</MenuItem>
+                <MenuItem>HEVC</MenuItem>
+              </MenuList>
+            </Menu>
+          ) : null}
         </HStack>
+        <Text>{downloadMessage.current}</Text>
       </Box>
     </>
   );

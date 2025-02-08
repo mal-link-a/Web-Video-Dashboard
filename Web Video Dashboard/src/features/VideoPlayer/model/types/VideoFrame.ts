@@ -1,5 +1,5 @@
 export enum VideoFrameFormat {
-  jpg = "jpeg",
+  jpg = "jpg",
   png = "png",
 }
 

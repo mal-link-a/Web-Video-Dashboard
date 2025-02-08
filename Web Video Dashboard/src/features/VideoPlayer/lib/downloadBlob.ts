@@ -1,4 +1,5 @@
-export const downloadScreenshot = (blob: Blob) => {
+//Сохранение изображения из blob на локальное устройство пользователя
+export const downloadBlob = (blob: Blob) => {
   //Создаем название файла
   const date = new Date();
   const dateString = `${date.getDate()}-${

@@ -1,3 +1,4 @@
+//Получает длительность видео, возвращает строку в формате минуты:секунды
 export const secondsToTime = (seconds: number) => {
   const min = Math.floor(seconds / 60);
   const sec = Math.floor(seconds - min * 60);
