@@ -2,7 +2,6 @@ import ReactPlayer from "react-player";
 import { captureVideoFrame } from "capture-video-frame";
 
 import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { fetchFile } from "@ffmpeg/util";
 
 import { BellIcon, DownloadIcon, TimeIcon } from "@chakra-ui/icons";
 import {
@@ -12,7 +11,6 @@ import {
   SliderThumb,
   Box,
   HStack,
-  Tooltip,
   Text,
   Input,
   Button,
@@ -30,8 +28,10 @@ import { PauseIcon } from "../../../../shared/components/PauseIcon";
 import { PlayIcon } from "../../../../shared/components/PlayIcon";
 import { VideoFrame, VideoFrameFormat } from "../../model/types/VideoFrame";
 import { downloadBlob } from "../../lib/downloadBlob";
-import { convertVideo } from "../../lib/convertVideo";
+import { compressVideo } from "../../lib/compressVideo";
 import { ffmpegLoad } from "../../lib/ffmpegLoad";
+import { VideoCompressFormat } from "../../model/types/VideoCompressFormat";
+import { CustomSlider } from "../../../../shared/components/CustomSlider";
 
 //Документация React Player https://www.npmjs.com/package/react-player
 //Документация capture-video-frame https://www.npmjs.com/package/capture-video-frame
@@ -40,15 +40,16 @@ import { ffmpegLoad } from "../../lib/ffmpegLoad";
 
 //FFMPEG на Vite не работает без правки конфига Vite https://github.com/ffmpegwasm/ffmpeg.wasm/issues/532#issuecomment-1676237863
 
-//ЗАХВАТ СКРИНШОТА
-// https://github.com/CookPete/react-player/issues/341
+//Захват скриншота https://github.com/CookPete/react-player/issues/341
 
 export const VideoPlayer = () => {
+  useEffect(() => {
+    console.log("render VideoPlayer" + new Date());
+  });
   //Инициируем FFMPEG
   useEffect(() => {
     const loadConverter = async () => {
       const isLoad = await ffmpegLoad(ffmpegRef.current);
-      console.log(isLoad);
       if (isLoad) {
         setConverterLoaded(isLoad);
       } else {
@@ -58,20 +59,32 @@ export const VideoPlayer = () => {
     loadConverter();
   }, []);
 
+  const videoFile = useRef<File | null>(null);
+
   const [videoFilePath, setVideoFilePath] = useState<string>("");
   const handleVideoUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     if (event.target.files) {
       setVideoFilePath(URL.createObjectURL(event.target.files[0]));
+      videoFile.current = event.target.files[0];
+    }
+  };
 
-      //Конвертирование и загрузка в формате
+  //Конвертирование и загрузка в новом формате
+  const onCompress = async (
+    e: React.MouseEvent<HTMLButtonElement, MouseEvent>
+  ) => {
+    const format = e.currentTarget.getAttribute(
+      "data-type"
+    ) as VideoCompressFormat;
+    if (videoFile.current != null) {
       const [ref, name, file] = [
         ffmpegRef.current,
-        event.target.files[0].name,
-        event.target.files[0],
+        videoFile.current.name,
+        videoFile.current,
       ];
-      const data = await convertVideo(ref, file, name, "output");
+      const data = await compressVideo(ref, file, format, name, "output");
       downloadBlob(new Blob([data.buffer], { type: "video/mp4" }));
     }
   };
@@ -92,9 +105,6 @@ export const VideoPlayer = () => {
 
   //Стартовая точка для слайдера воспроизведения видео. Мы обрезаем видео на пяти минутах, поэтому она нужна.
   const [startPlaybackPoint, setStartPlaybactPoint] = useState<number>(0);
-
-  const [volumeTooltip, setVolumeTooltip] = useState(false); //Отображение текущих значений при наведении на слайдеры
-  const [playbackRateTooltip, setPlaybackRateTooltip] = useState(false); //Отображение текущих значений при наведении на слайдеры
 
   const [playing, setPlaying] = useState<boolean>(false); // Воспроизведение/пауза
 
@@ -129,7 +139,10 @@ export const VideoPlayer = () => {
   };
 
   //Загружаем картинку по клику. Инициируем ссылку, нажатие на неё и загрузку.
-  const onTakeScreenshot = async (format: VideoFrameFormat) => {
+  const onTakeScreenshot = async (
+    e: React.MouseEvent<HTMLButtonElement, MouseEvent>
+  ) => {
+    const format = e.currentTarget.getAttribute("data-type");
     //Получаем изображение с помощью библиотеки capture-video-frame
     if (player.current !== null) {
       videoFrame.current = await captureVideoFrame(
@@ -224,70 +237,36 @@ export const VideoPlayer = () => {
 
         <HStack mb="40px">
           <BellIcon />
-          <Slider
-            max={1}
-            min={0}
+          <CustomSlider
+            onChangeProp={onChangeVolume}
+            minVal={0}
+            maxVal={1}
             step={0.01}
-            aria-label="slider-ex-4"
-            defaultValue={1}
-            onChange={onChangeVolume}
-            onMouseEnter={() => setVolumeTooltip(true)}
-            onMouseLeave={() => setVolumeTooltip(false)}
-          >
-            <Tooltip
-              hasArrow
-              bg="teal.500"
-              color="white"
-              placement="top"
-              isOpen={volumeTooltip}
-              label={`${Math.round(volume * 100)}%`}
-            >
-              <SliderThumb />
-            </Tooltip>
-            <SliderTrack bg="red.100">
-              <SliderFilledTrack bg="tomato" />
-            </SliderTrack>
-            <SliderThumb boxSize={6}>
-              <Box color="tomato" as={MdGraphicEq} />
-            </SliderThumb>
-          </Slider>
+            valFormat={(num) => `${Math.round(num * 100)}%`}
+          />
         </HStack>
         <HStack>
           <TimeIcon />
-          <Slider
-            max={2}
-            min={0.2}
+          <CustomSlider
+            onChangeProp={onChangePlaybackRate}
+            minVal={0.1}
+            maxVal={1}
             step={0.01}
-            aria-label="slider-ex-4"
-            defaultValue={1}
-            onMouseEnter={() => setPlaybackRateTooltip(true)}
-            onMouseLeave={() => setPlaybackRateTooltip(false)}
-            onChange={onChangePlaybackRate}
-          >
-            <Tooltip
-              hasArrow
-              bg="teal.500"
-              color="white"
-              placement="top"
-              isOpen={playbackRateTooltip}
-              label={`x${playbackRate}`}
-            >
-              <SliderThumb />
-            </Tooltip>
-            <SliderTrack bg="red.100">
-              <SliderFilledTrack bg="tomato" />
-            </SliderTrack>
-            <SliderThumb boxSize={6}>
-              <Box color="tomato" as={MdGraphicEq} />
-            </SliderThumb>
-          </Slider>
+            valFormat={(num) => `х${num}`}
+          />
         </HStack>
 
         <HStack mt="30px" gap="10px">
           <Button onClick={onPause}>
-            {playing ? <PauseIcon /> : <PlayIcon />}
+            {videoFile.current != null ? (
+              playing ? (
+                <PauseIcon />
+              ) : (
+                <PlayIcon />
+              )
+            ) : null}
           </Button>
-          {playing ? null : (
+          {!playing && videoFile.current != null ? (
             <Menu>
               <MenuButton as={Button}>
                 <DownloadIcon />
@@ -295,23 +274,26 @@ export const VideoPlayer = () => {
               <MenuList>
                 {Object.entries(VideoFrameFormat).map(([key, value]) => (
                   <MenuItem
-                    onClick={() => {
-                      onTakeScreenshot(value);
-                    }}
+                    key={key}
+                    data-type={value}
+                    onClick={onTakeScreenshot}
                   >
                     {key}
                   </MenuItem>
                 ))}
               </MenuList>
             </Menu>
-          )}
+          ) : null}
 
-          {converterLoaded ? (
+          {converterLoaded && videoFile.current != null ? (
             <Menu>
               <MenuButton as={Button}>Конвертировать и скачать</MenuButton>
               <MenuList>
-                <MenuItem>MP4</MenuItem>
-                <MenuItem>HEVC</MenuItem>
+                {Object.entries(VideoCompressFormat).map(([key, value]) => (
+                  <MenuItem key={key} data-type={value} onClick={onCompress}>
+                    {key}
+                  </MenuItem>
+                ))}
               </MenuList>
             </Menu>
           ) : null}
