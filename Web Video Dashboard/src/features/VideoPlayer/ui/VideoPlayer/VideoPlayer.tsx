@@ -27,6 +27,21 @@ export const VideoPlayer = () => {
   const toast = useToast(); //Всплывающее окно. Используем на обработку ошибок
 
   const videoFile = useRef<File | null>(null); //Реф текущего выюранного видеофайла
+  const [isConverterLoaded, setConverterLoaded] = useState<boolean>(false); //флаг загрузки ffmpeg
+  const ffmpegRef = useRef(new FFmpeg());
+  const player = useRef<ReactPlayer>(null); //Проигрыватель
+  const fulscreenRef = useRef<HTMLDivElement>(null); //Итем для показа в полноэкранном режиме
+  const [volume, setVolume] = useState<number>(1); //Громкость
+  const [playbackRate, setPlaybackRate] = useState<number>(1); //Скорость воспроизведения
+  const [played, setPlayed] = useState<number>(0); //Место проигрывания сейчас
+  const [duration, setDuration] = useState<number>(0); //Длительность видео в секундах
+  const [durationFormatted, setDurationFormatted] = useState<string>(""); //Визуальное отображение длительности видео (Формат MM:SS)
+  //Стартовая точка для слайдера воспроизведения видео. Мы обрезаем видео на пяти минутах, поэтому она нужна.
+  const [startPlaybackPoint, setStartPlaybactPoint] = useState<number>(0);
+  const [isPlaying, setPlaying] = useState<boolean>(false); // Воспроизведение/пауза
+  const downloadMessage = useRef<string>("");
+  const [videoFilePath, setVideoFilePath] = useState<string>("");
+
   //Инициируем FFMPEG.wasm
   useEffect(() => {
     const loadConverter = async () => {
@@ -55,6 +70,7 @@ export const VideoPlayer = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  //Простенькие элементы управления с клавиатуры
   const onKeyDown = (e: KeyboardEvent) => {
     const key = e.key;
     if (key === " ") {
@@ -66,42 +82,20 @@ export const VideoPlayer = () => {
     }
   };
 
-  const [videoFilePath, setVideoFilePath] = useState<string>("");
-  const handleVideoUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  //Загрузка видео в проигрыватель
+  const onVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setVideoFilePath(URL.createObjectURL(event.target.files[0]));
       videoFile.current = event.target.files[0];
     }
   };
 
-  const [isConverterLoaded, setConverterLoaded] = useState<boolean>(false); //флаг загрузки ffmpeg
-  const ffmpegRef = useRef(new FFmpeg());
-
-  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  const player = useRef<ReactPlayer>(null);
-  const fulscreenRef = useRef<HTMLDivElement>(null);
-
-  const [volume, setVolume] = useState<number>(1); //Громкость
-  const [playbackRate, setPlaybackRate] = useState<number>(1); //Скорость воспроизведения
-  const [played, setPlayed] = useState<number>(0); //Место проигрывания сейчас
-
-  const [duration, setDuration] = useState<number>(0); //Длительность видео в секундах
-  const [durationFormatted, setDurationFormatted] = useState<string>(""); //Визуальное отображение длительности видео (Формат MM:SS)
-
-  //Стартовая точка для слайдера воспроизведения видео. Мы обрезаем видео на пяти минутах, поэтому она нужна.
-  const [startPlaybackPoint, setStartPlaybactPoint] = useState<number>(0);
-
-  const [isPlaying, setPlaying] = useState<boolean>(false); // Воспроизведение/пауза
-
-  const downloadMessage = useRef<string>("");
   //Меняем громкость
   const onChangeVolume = (val: number) => {
     setVolume(val);
   };
 
+  //Перематываем видео
   const onChangeSeekStart = () => {
     setPlaying(false);
   };
@@ -109,7 +103,6 @@ export const VideoPlayer = () => {
     if (player.current) player.current.seekTo(val, "seconds");
     setPlayed(val);
   };
-
   //Выбрали перенос времени
   const onChangeSeekEnd = () => {
     setPlaying(true);
@@ -120,6 +113,7 @@ export const VideoPlayer = () => {
     setPlaybackRate(val);
   };
 
+  //Воспроизведение/Пауза
   const onPauseSwitch = () => {
     setPlaying((prev) => !prev);
   };
@@ -168,7 +162,7 @@ export const VideoPlayer = () => {
           position="absolute"
           visibility="hidden"
           type="file"
-          onChange={handleVideoUpload}
+          onChange={onVideoUpload}
           size="md"
           mb="40px"
         />

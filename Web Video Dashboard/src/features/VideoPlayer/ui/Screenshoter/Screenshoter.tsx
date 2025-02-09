@@ -36,14 +36,13 @@ export const Screenshoter = ({ reactPlayer, isVisible }: Props) => {
   return (
     <Menu>
       <MenuButton
-        variant="outline"
+        colorScheme="whiteAlpha"
         size={["xs", "md", "md"]}
         w={["28.px", "50px"]}
         padding={0}
         visibility={isVisible ? "visible" : "hidden"}
-        bg="transparent"
-        _hover={{ bg: "transparent" }}
         as={Button}
+        color="black"
       >
         <DownloadIcon
           position={"absolute"}

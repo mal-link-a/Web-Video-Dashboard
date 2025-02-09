@@ -19,8 +19,9 @@ interface Props {
 }
 
 export const VideoCompressor = ({ ffmpegRef, videoFile }: Props) => {
-  const [progress, setProgress] = useState<number>(0);
+  const [convProgress, setProgress] = useState<number>(0);
   const [progressMsg, setProgressMsg] = useState<string>("");
+  const [isCompressing, setCompressing] = useState<boolean>(false);
 
   const onCompress = async (
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>
@@ -43,23 +44,31 @@ export const VideoCompressor = ({ ffmpegRef, videoFile }: Props) => {
   //В документации указано, что прогресс - экспериментальная функция, и на самом деле она показывает время неправильно
   ffmpegRef.on("progress", ({ progress }) => {
     setProgress(progress);
-    setProgressMsg(`${Math.floor(progress * 10000) / 100}%`);
+    if (progress < 1) {
+      setProgressMsg(`${Math.floor(progress * 10000) / 100}%`);
+    } else {
+      setProgressMsg(``);
+    }
+
+    console.log(progress);
+    if (progress > 1) {
+      console.log(123);
+      setCompressing(false);
+    } else {
+      setCompressing(true);
+    }
   });
 
   return (
     <>
       <Menu>
         <MenuButton
-          _active={{ background: "transparent" }}
-          variant="outline"
-          color="white"
+          colorScheme="blackAlpha"
           zIndex={1000}
           position="absolute"
           left="20px"
           top="20px"
           size={["xs", "sm", "md"]}
-          bg="transparent"
-          _hover={{ bg: "transparent" }}
           as={Button}
           value={["Сжать", "Конвертировать", " Конвертировать и скачать"]}
         >
@@ -78,11 +87,17 @@ export const VideoCompressor = ({ ffmpegRef, videoFile }: Props) => {
           ))}
         </MenuList>
       </Menu>
-      <Progress hasStripe value={progress * 100} />
+      <Progress
+        visibility={isCompressing ? "visible" : "hidden"}
+        hasStripe
+        value={convProgress * 100}
+      />
       <Text
+        color="white"
+        bg="black"
         position="absolute"
-        right="0px"
-        bottom="0px"
+        left="0px"
+        top="0px"
         fontSize={["xs", "sm", "xs"]}
       >
         {progressMsg}

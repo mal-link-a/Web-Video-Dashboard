@@ -165,7 +165,7 @@ export const Controls = ({
           </VStack>
           <HStack>
             <Button
-              variant="outline"
+              colorScheme="whiteAlpha"
               size={["xs", "md", "md"]}
               onClick={onClickFullscreen}
             >
@@ -173,7 +173,7 @@ export const Controls = ({
             </Button>
             <Button
               size={["xs", "md", "md"]}
-              variant="outline"
+              colorScheme="whiteAlpha"
               onClick={onPauseSwitch}
             >
               {isPlaying ? <PauseIcon /> : <PlayIcon />}
