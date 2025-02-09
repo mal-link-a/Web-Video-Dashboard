@@ -11,7 +11,6 @@ import {
 } from "@chakra-ui/react";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { useState } from "react";
-
 import { compressFormats } from "../../../../VideoPlayer/model/compressFormats";
 
 interface Props {
@@ -28,7 +27,7 @@ export const VideoCompressor = ({ ffmpegRef, videoFile }: Props) => {
   ) => {
     const format = e.currentTarget.getAttribute("data-type") as VideoFormat;
     const customFormatting =
-      e.currentTarget.getAttribute("data-customFormatting") === "true";
+      e.currentTarget.getAttribute("data-customformatting") === "true";
     if (videoFile != null) {
       await compressVideo(
         ffmpegRef,
@@ -41,25 +40,37 @@ export const VideoCompressor = ({ ffmpegRef, videoFile }: Props) => {
   };
 
   //Слушатель на время загрузки файла
-  ffmpegRef.on("progress", ({ progress, time }) => {
+  //В документации указано, что прогресс - экспериментальная функция, и на самом деле она показывает время неправильно
+  ffmpegRef.on("progress", ({ progress }) => {
     setProgress(progress);
-    setProgressMsg(
-      `${Math.floor(progress * 10000) / 100} %, transcoded time: ${
-        time / 1000000
-      } s`
-    );
+    setProgressMsg(`${Math.floor(progress * 10000) / 100}%`);
   });
 
   return (
     <>
       <Menu>
-        <MenuButton as={Button}>Конвертировать и скачать</MenuButton>
+        <MenuButton
+          _active={{ background: "transparent" }}
+          variant="outline"
+          color="white"
+          zIndex={1000}
+          position="absolute"
+          left="20px"
+          top="20px"
+          size={["xs", "sm", "md"]}
+          bg="transparent"
+          _hover={{ bg: "transparent" }}
+          as={Button}
+          value={["Сжать", "Конвертировать", " Конвертировать и скачать"]}
+        >
+          Конвертировать и загрузить
+        </MenuButton>
         <MenuList>
           {compressFormats.map(({ format, customFormatting }) => (
             <MenuItem
               key={format}
               data-type={format}
-              data-customFormatting={customFormatting}
+              data-customformatting={customFormatting}
               onClick={onCompress}
             >
               {format}
@@ -68,7 +79,14 @@ export const VideoCompressor = ({ ffmpegRef, videoFile }: Props) => {
         </MenuList>
       </Menu>
       <Progress hasStripe value={progress * 100} />
-      <Text>{progressMsg}</Text>
+      <Text
+        position="absolute"
+        right="0px"
+        bottom="0px"
+        fontSize={["xs", "sm", "xs"]}
+      >
+        {progressMsg}
+      </Text>
     </>
   );
 };

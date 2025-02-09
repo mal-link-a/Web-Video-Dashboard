@@ -1,51 +1,33 @@
-import ReactPlayer from "react-player";
-import { captureVideoFrame } from "capture-video-frame";
-
+import ReactPlayer from "react-player/file";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
-
-import { BellIcon, DownloadIcon, TimeIcon } from "@chakra-ui/icons";
-import {
-  Slider,
-  SliderTrack,
-  SliderFilledTrack,
-  SliderThumb,
-  Box,
-  HStack,
-  Text,
-  Input,
-  Button,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-} from "@chakra-ui/react";
-
-import { MdGraphicEq } from "react-icons/md";
+import { Box, Input } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { PlayerProgress } from "../../model/types/PlayerProgress";
 import { secondsToTime } from "../../lib/secondsToTime";
-import { PauseIcon } from "../../../../shared/components/PauseIcon";
-import { PlayIcon } from "../../../../shared/components/PlayIcon";
-import { VideoFrame, VideoFrameFormat } from "../../model/types/VideoFrame";
-import { downloadBlob } from "../../lib/downloadBlob";
 import { ffmpegLoad } from "../../lib/ffmpegLoad";
-import { CustomSlider } from "../../../../shared/components/CustomSlider";
-import { VideoCompressor } from "./VideoCompressor/VideoCompressor";
+import { Controls } from "../Controls/Controls";
+import { useToast } from "@chakra-ui/react";
+import { DownloadIcon } from "@/shared/components/Icons/DownloadIcon";
+import screenfull from "screenfull";
 
 //Документация React Player https://www.npmjs.com/package/react-player
 //Документация capture-video-frame https://www.npmjs.com/package/capture-video-frame
 //Документация Chakra UI v2 https://v2.chakra-ui.com/
 //ffmpeg.wasm https://github.com/ffmpegwasm/ffmpeg.wasm
-
-//FFMPEG на Vite не работает без правки конфига Vite https://github.com/ffmpegwasm/ffmpeg.wasm/issues/532#issuecomment-1676237863
-
+//Документация screenfull https://www.npmjs.com/package/screenfull
 //Захват скриншота https://github.com/CookPete/react-player/issues/341
 
+//FFMPEG.wasm на Vite не работает без правки конфига Vite https://github.com/ffmpegwasm/ffmpeg.wasm/issues/532#issuecomment-1676237863
+//Иии FFMPEG.wasm не позволяет выбрать самостоятельно кодек для компрессии видео
+//С одной стороны FFMPEG.wasm занимаются люди, погужённые в работу с видеофайлами,
+//С другой - нельзя самостоятельно выбрать кодеки, только форматы.
+//Если хотим сами выбирать кодеки, то нужно пробовать разворачивать в воркерах основной FFMPEG.
+
 export const VideoPlayer = () => {
-  useEffect(() => {
-    console.log("render VideoPlayer" + new Date());
-  });
-  //Инициируем FFMPEG
+  const toast = useToast(); //Всплывающее окно. Используем на обработку ошибок
+
+  const videoFile = useRef<File | null>(null); //Реф текущего выюранного видеофайла
+  //Инициируем FFMPEG.wasm
   useEffect(() => {
     const loadConverter = async () => {
       const isLoad = await ffmpegLoad(ffmpegRef.current);
@@ -53,12 +35,36 @@ export const VideoPlayer = () => {
         setConverterLoaded(isLoad);
       } else {
         //Обрабатываем
+        //Показываем всплывающее окно об ошибке.
+        toast({
+          title: `Не удалось запустить FFMPEG.wasm. Компрессия видео будет недоступна`,
+          status: "error",
+          isClosable: true,
+        });
       }
     };
     loadConverter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const videoFile = useRef<File | null>(null);
+  useEffect(() => {
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    const key = e.key;
+    if (key === " ") {
+      onPauseSwitch();
+    } else if (key === "+") {
+      setVolume((prev) => Math.min(1, prev + 0.05));
+    } else if (key === "-") {
+      setVolume((prev) => Math.max(0, prev - 0.05));
+    }
+  };
 
   const [videoFilePath, setVideoFilePath] = useState<string>("");
   const handleVideoUpload = async (
@@ -70,12 +76,13 @@ export const VideoPlayer = () => {
     }
   };
 
-  const [converterLoaded, setConverterLoaded] = useState<boolean>(false); //флаг загрузки ffmpeg
+  const [isConverterLoaded, setConverterLoaded] = useState<boolean>(false); //флаг загрузки ffmpeg
   const ffmpegRef = useRef(new FFmpeg());
 
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   const player = useRef<ReactPlayer>(null);
+  const fulscreenRef = useRef<HTMLDivElement>(null);
 
   const [volume, setVolume] = useState<number>(1); //Громкость
   const [playbackRate, setPlaybackRate] = useState<number>(1); //Скорость воспроизведения
@@ -87,9 +94,7 @@ export const VideoPlayer = () => {
   //Стартовая точка для слайдера воспроизведения видео. Мы обрезаем видео на пяти минутах, поэтому она нужна.
   const [startPlaybackPoint, setStartPlaybactPoint] = useState<number>(0);
 
-  const [playing, setPlaying] = useState<boolean>(false); // Воспроизведение/пауза
-
-  const videoFrame = useRef<VideoFrame | boolean>(false); // Реф для захвата картинки для скриншотов
+  const [isPlaying, setPlaying] = useState<boolean>(false); // Воспроизведение/пауза
 
   const downloadMessage = useRef<string>("");
   //Меняем громкость
@@ -97,7 +102,7 @@ export const VideoPlayer = () => {
     setVolume(val);
   };
 
-  const onChangeStartSeek = () => {
+  const onChangeSeekStart = () => {
     setPlaying(false);
   };
   const onChangeSeek = (val: number) => {
@@ -106,7 +111,7 @@ export const VideoPlayer = () => {
   };
 
   //Выбрали перенос времени
-  const onChangeEndSeek = () => {
+  const onChangeSeekEnd = () => {
     setPlaying(true);
   };
 
@@ -115,30 +120,15 @@ export const VideoPlayer = () => {
     setPlaybackRate(val);
   };
 
-  const onPause = () => {
+  const onPauseSwitch = () => {
     setPlaying((prev) => !prev);
   };
 
-  //Загружаем картинку по клику. Инициируем ссылку, нажатие на неё и загрузку.
-  const onTakeScreenshot = async (
-    e: React.MouseEvent<HTMLButtonElement, MouseEvent>
-  ) => {
-    const format = e.currentTarget.getAttribute("data-type");
-    //Получаем изображение с помощью библиотеки capture-video-frame
-    if (player.current !== null) {
-      videoFrame.current = await captureVideoFrame(
-        player.current.getInternalPlayer(),
-        format,
-        1
-      );
-      //Сохраняем
-      if (typeof videoFrame.current != "boolean") {
-        downloadBlob(videoFrame.current.blob);
-      }
-      //captureVideoFrame возвращает false, если не сработает
-      else {
-        throw new Error("captureVideoFrame не смог захватить изображение");
-      }
+  const onClickFullscreen = () => {
+    if (screenfull.isFullscreen) {
+      screenfull.exit();
+    } else {
+      if (fulscreenRef.current) screenfull.request(fulscreenRef.current);
     }
   };
 
@@ -146,7 +136,6 @@ export const VideoPlayer = () => {
   const onDuration = (val: number) => {
     //Если длительность видео боьше 5 минут, обрезаем начало и переносим произведение на 5 минут.
     if (val > 300) {
-      console.log("duration > 300");
       const startPoint = val - 300;
       setStartPlaybactPoint(startPoint);
       setPlayed(startPoint);
@@ -174,105 +163,61 @@ export const VideoPlayer = () => {
 
   return (
     <>
-      <Input type="file" onChange={handleVideoUpload} size="md" mb="40px" />
-      <ReactPlayer
-        playing={playing}
-        ref={player}
-        volume={volume}
-        playbackRate={playbackRate}
-        controls={false}
-        onProgress={onProgress}
-        onDuration={onDuration}
-        onStart={onStart}
-        progressInterval={1000 / playbackRate}
-        url={videoFilePath}
-        config={{
-          file: {
+      <label>
+        <Input
+          position="absolute"
+          visibility="hidden"
+          type="file"
+          onChange={handleVideoUpload}
+          size="md"
+          mb="40px"
+        />
+        <DownloadIcon size="48px" />
+      </label>
+
+      <Box ref={fulscreenRef} position="relative" w="100%">
+        <ReactPlayer
+          width="100%"
+          height="100%"
+          playing={isPlaying}
+          ref={player}
+          volume={volume}
+          playbackRate={playbackRate}
+          controls={false}
+          onProgress={onProgress}
+          onDuration={onDuration}
+          onStart={onStart}
+          progressInterval={1000 / playbackRate}
+          url={videoFilePath}
+          config={{
             attributes: {
               crossOrigin: "anonymous",
             },
-          },
-        }}
-      />
-      <Box p={4} pt={6}>
-        <Text>{`${secondsToTime(played)} из ${durationFormatted}`}</Text>
-        <Slider
-          mb="40px"
-          aria-label="slider-ex-4"
-          min={startPlaybackPoint}
-          max={duration}
-          value={played}
-          onChangeStart={onChangeStartSeek}
-          onChange={onChangeSeek}
-          onChangeEnd={onChangeEndSeek}
-        >
-          <SliderTrack bg="red.100">
-            <SliderFilledTrack bg="tomato" />
-          </SliderTrack>
-          <SliderThumb boxSize={6}>
-            <Box color="tomato" as={MdGraphicEq} />
-          </SliderThumb>
-        </Slider>
-
-        <HStack mb="40px">
-          <BellIcon />
-          <CustomSlider
-            onChangeProp={onChangeVolume}
-            minVal={0}
-            maxVal={1}
-            step={0.01}
-            valFormat={(num) => `${Math.round(num * 100)}%`}
-          />
-        </HStack>
-        <HStack>
-          <TimeIcon />
-          <CustomSlider
-            onChangeProp={onChangePlaybackRate}
-            minVal={0.1}
-            maxVal={1}
-            step={0.01}
-            valFormat={(num) => `х${num}`}
-          />
-        </HStack>
-
-        <HStack mt="30px" gap="10px">
-          <Button onClick={onPause}>
-            {videoFile.current != null ? (
-              playing ? (
-                <PauseIcon />
-              ) : (
-                <PlayIcon />
-              )
-            ) : null}
-          </Button>
-          {!playing && videoFile.current != null ? (
-            <Menu>
-              <MenuButton as={Button}>
-                <DownloadIcon />
-              </MenuButton>
-              <MenuList>
-                {Object.entries(VideoFrameFormat).map(([key, value]) => (
-                  <MenuItem
-                    key={key}
-                    data-type={value}
-                    onClick={onTakeScreenshot}
-                  >
-                    {key}
-                  </MenuItem>
-                ))}
-              </MenuList>
-            </Menu>
-          ) : null}
-        </HStack>
-        {converterLoaded && videoFile.current != null ? (
-          <VideoCompressor
-            ffmpegRef={ffmpegRef.current}
+          }}
+        ></ReactPlayer>
+        {videoFile.current != null ? (
+          <Controls
+            onPauseSwitch={onPauseSwitch}
+            onChangeVolume={onChangeVolume}
+            onChangePlaybackRate={onChangePlaybackRate}
+            onChangeSeekStart={onChangeSeekStart}
+            onChangeSeek={onChangeSeek}
+            onChangeSeekEnd={onChangeSeekEnd}
+            seekValue={played}
+            seekMin={startPlaybackPoint}
+            seekMax={duration}
+            videoDiration={durationFormatted}
+            videoPlayed={secondsToTime(played)}
+            isPlaying={isPlaying}
+            reactPlayer={player.current}
+            ffmpeg={ffmpegRef.current}
             videoFile={videoFile.current}
+            isConverterLoaded={isConverterLoaded}
+            volume={volume}
+            onClickFullscreen={onClickFullscreen}
           />
         ) : null}
       </Box>
     </>
   );
 };
-
-//https://github.com/CookPete/react-player/issues/638

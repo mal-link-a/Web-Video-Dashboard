@@ -1,12 +1,13 @@
 import "./App.css";
 import { VideoPlayer } from "./features/VideoPlayer/ui/VideoPlayer/VideoPlayer";
-import { Test } from "./features/Test/Test";
+import { Box } from "@chakra-ui/react";
 
 function App() {
   return (
     <>
-      <h1>Vite + React</h1>
-      <VideoPlayer />
+      <Box backgroundColor="white" maxW="1280px" minW="90%">
+        <VideoPlayer />
+      </Box>
     </>
   );
 }
