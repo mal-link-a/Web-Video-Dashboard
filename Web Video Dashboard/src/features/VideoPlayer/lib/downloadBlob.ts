@@ -1,10 +1,10 @@
 //Сохранение изображения из blob на локальное устройство пользователя
-export const downloadBlob = (blob: Blob) => {
+export const downloadBlob = (blob: Blob, format: string = "") => {
   //Создаем название файла
   const date = new Date();
   const dateString = `${date.getDate()}-${
     date.getMonth() + 1
-  }-${date.getFullYear()}_${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
+  }-${date.getFullYear()}_${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}${format}`;
   //Создаём линк на загрузку изобржажения, выполняем его и удаляем
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);

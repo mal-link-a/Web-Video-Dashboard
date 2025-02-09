@@ -35,7 +35,6 @@ export const CustomSlider = ({
     setValueLabel(valFormat(defaultVal ?? 1));
   }, []);
 
-  console.log("render VideoSlider");
   const onChange = (_value: number) => {
     setValue(_value);
     setValueLabel(valFormat(_value));

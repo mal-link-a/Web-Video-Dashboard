@@ -28,10 +28,9 @@ import { PauseIcon } from "../../../../shared/components/PauseIcon";
 import { PlayIcon } from "../../../../shared/components/PlayIcon";
 import { VideoFrame, VideoFrameFormat } from "../../model/types/VideoFrame";
 import { downloadBlob } from "../../lib/downloadBlob";
-import { compressVideo } from "../../lib/compressVideo";
 import { ffmpegLoad } from "../../lib/ffmpegLoad";
-import { VideoCompressFormat } from "../../model/types/VideoCompressFormat";
 import { CustomSlider } from "../../../../shared/components/CustomSlider";
+import { VideoCompressor } from "./VideoCompressor/VideoCompressor";
 
 //Документация React Player https://www.npmjs.com/package/react-player
 //Документация capture-video-frame https://www.npmjs.com/package/capture-video-frame
@@ -68,24 +67,6 @@ export const VideoPlayer = () => {
     if (event.target.files) {
       setVideoFilePath(URL.createObjectURL(event.target.files[0]));
       videoFile.current = event.target.files[0];
-    }
-  };
-
-  //Конвертирование и загрузка в новом формате
-  const onCompress = async (
-    e: React.MouseEvent<HTMLButtonElement, MouseEvent>
-  ) => {
-    const format = e.currentTarget.getAttribute(
-      "data-type"
-    ) as VideoCompressFormat;
-    if (videoFile.current != null) {
-      const [ref, name, file] = [
-        ffmpegRef.current,
-        videoFile.current.name,
-        videoFile.current,
-      ];
-      const data = await compressVideo(ref, file, format, name, "output");
-      downloadBlob(new Blob([data.buffer], { type: "video/mp4" }));
     }
   };
 
@@ -183,7 +164,6 @@ export const VideoPlayer = () => {
   const onProgress = (obj: PlayerProgress) => {
     setPlayed(obj.playedSeconds);
   };
-
   const ffmpeg = ffmpegRef.current;
   // Listen to progress event instead of log.
   ffmpeg.on("progress", ({ progress, time }) => {
@@ -195,7 +175,6 @@ export const VideoPlayer = () => {
   return (
     <>
       <Input type="file" onChange={handleVideoUpload} size="md" mb="40px" />
-
       <ReactPlayer
         playing={playing}
         ref={player}
@@ -284,21 +263,13 @@ export const VideoPlayer = () => {
               </MenuList>
             </Menu>
           ) : null}
-
-          {converterLoaded && videoFile.current != null ? (
-            <Menu>
-              <MenuButton as={Button}>Конвертировать и скачать</MenuButton>
-              <MenuList>
-                {Object.entries(VideoCompressFormat).map(([key, value]) => (
-                  <MenuItem key={key} data-type={value} onClick={onCompress}>
-                    {key}
-                  </MenuItem>
-                ))}
-              </MenuList>
-            </Menu>
-          ) : null}
         </HStack>
-        <Text>{downloadMessage.current}</Text>
+        {converterLoaded && videoFile.current != null ? (
+          <VideoCompressor
+            ffmpegRef={ffmpegRef.current}
+            videoFile={videoFile.current}
+          />
+        ) : null}
       </Box>
     </>
   );
