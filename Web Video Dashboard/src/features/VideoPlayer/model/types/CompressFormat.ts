@@ -9,6 +9,8 @@ export enum VideoFormat {
 export interface CompressFormat {
   format: VideoFormat;
   customFormatting: boolean;
+  codec?: string;
+  codecLib?: string;
 }
 
 export type CompressFormats = CompressFormat[];

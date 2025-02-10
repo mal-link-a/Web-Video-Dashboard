@@ -13,7 +13,8 @@ import screenfull from "screenfull";
 //Документация React Player https://www.npmjs.com/package/react-player
 //Документация capture-video-frame https://www.npmjs.com/package/capture-video-frame
 //Документация Chakra UI v2 https://v2.chakra-ui.com/
-//ffmpeg.wasm https://github.com/ffmpegwasm/ffmpeg.wasm
+//Документация ffmpeg.wasm https://github.com/ffmpegwasm/ffmpeg.wasm
+//Документация Ffmpeg https://www.ffmpeg.org/ffmpeg.html
 //Документация screenfull https://www.npmjs.com/package/screenfull
 //Захват скриншота https://github.com/CookPete/react-player/issues/341
 
@@ -133,6 +134,11 @@ export const VideoPlayer = () => {
       const startPoint = val - 300;
       setStartPlaybactPoint(startPoint);
       setPlayed(startPoint);
+      toast({
+        title: `Будут показаны последние 5 минут видеофайла`,
+        status: "info",
+        isClosable: true,
+      });
     }
     setDuration(val);
     setDurationFormatted(secondsToTime(val));

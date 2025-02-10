@@ -4,6 +4,8 @@ export const compressFormats: CompressFormats = [
   {
     format: VideoFormat.mp4,
     customFormatting: false,
+    codec: "х264",
+    codecLib: "libx264",
   },
   {
     format: VideoFormat.mkv,

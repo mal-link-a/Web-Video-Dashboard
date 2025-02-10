@@ -11,10 +11,10 @@ export const ffmpegLoad = async (ffmpegRef: FFmpeg) => {
         `${baseURL}/ffmpeg-core.wasm`,
         "application/wasm"
       ),
-      workerURL: await toBlobURL(
-        `https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm/ffmpeg-core.worker.js`,
-        "text/javascript"
-      ),
+      // workerURL: await toBlobURL(
+      //   `https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm/ffmpeg-core.worker.js`,
+      //   "text/javascript"
+      // ),
     });
     return true;
   } catch {

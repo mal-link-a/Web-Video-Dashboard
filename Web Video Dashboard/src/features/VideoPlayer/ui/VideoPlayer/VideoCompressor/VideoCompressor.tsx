@@ -29,13 +29,17 @@ export const VideoCompressor = ({ ffmpegRef, videoFile }: Props) => {
     const format = e.currentTarget.getAttribute("data-type") as VideoFormat;
     const customFormatting =
       e.currentTarget.getAttribute("data-customformatting") === "true";
+    const codecLib = e.currentTarget.getAttribute("data-codeclib");
+    console.log(codecLib);
+
     if (videoFile != null) {
       await compressVideo(
         ffmpegRef,
         videoFile,
         format,
         "output",
-        customFormatting
+        customFormatting,
+        codecLib
       );
     }
   };
@@ -50,9 +54,7 @@ export const VideoCompressor = ({ ffmpegRef, videoFile }: Props) => {
       setProgressMsg(``);
     }
 
-    console.log(progress);
     if (progress > 1) {
-      console.log(123);
       setCompressing(false);
     } else {
       setCompressing(true);
@@ -75,16 +77,19 @@ export const VideoCompressor = ({ ffmpegRef, videoFile }: Props) => {
           Конвертировать и загрузить
         </MenuButton>
         <MenuList>
-          {compressFormats.map(({ format, customFormatting }) => (
-            <MenuItem
-              key={format}
-              data-type={format}
-              data-customformatting={customFormatting}
-              onClick={onCompress}
-            >
-              {format}
-            </MenuItem>
-          ))}
+          {compressFormats.map(
+            ({ format, customFormatting, codec, codecLib }) => (
+              <MenuItem
+                key={`${format}_${codec}`}
+                data-type={format}
+                data-customformatting={customFormatting}
+                data-codeclib={codecLib}
+                onClick={onCompress}
+              >
+                {`${format} ${codec ?? ""}`}
+              </MenuItem>
+            )
+          )}
         </MenuList>
       </Menu>
       <Progress

@@ -8,10 +8,18 @@ export const compressVideo = async (
   file: File,
   format: VideoFormat,
   newName: string,
-  customFormatting: boolean
+  customFormatting: boolean,
+  codecLib: string | null
 ) => {
   await ffmpegRef.writeFile(file.name, await fetchFile(file));
-  await ffmpegRef.exec(["-i", file.name, `${newName}.${format}`]);
+  const params: string[] = ["-i", file.name];
+  if (codecLib != null) {
+    params.push("-c:v");
+    params.push(codecLib);
+  }
+  params.push(`${newName}.${format}`);
+  await ffmpegRef.exec(params);
+
   const data = (await ffmpegRef.readFile(`${newName}.${format}`)) as Uint8Array;
   if (customFormatting) {
     downloadBlob(
@@ -23,8 +31,16 @@ export const compressVideo = async (
   }
 };
 //mp4
-//flv (lossy) плохой
-//wmv (lossy) плохой
-//hevc не справляется
+// libx264
+// libx265 не справляется
+
+// libvpx-vp9 не справляется
+// Форматы
+//flv (lossy)
+//wmv (lossy)
 //mkv
-//ogg (lossy) плохой
+//ogg (lossy)
+
+//Итог таков, что ffmpeg.wasm удовлетворит необходимые требования для таски
+// и при этом обладает никакой документацией
+//Приходится опытным путём определять, что он может конвертировать, а что не может
