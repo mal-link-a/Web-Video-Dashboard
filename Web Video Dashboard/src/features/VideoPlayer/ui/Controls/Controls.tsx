@@ -8,60 +8,56 @@ import { PauseIcon } from "@/shared/components/Icons/PauseIcon";
 import { PlayIcon } from "@/shared/components/Icons/PlayIcon";
 import FilePlayer from "react-player/file";
 import { Screenshoter } from "../Screenshoter/Screenshoter";
-import { VideoCompressor } from "../VideoPlayer/VideoCompressor/VideoCompressor";
+import { VideoCompressor } from "../VideoCompressor/VideoCompressor";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { FullscreenIcon } from "@/shared/components/Icons/FullscreenIcon";
+import { useAppDispatch, useAppSelector } from "@/app/store/hooks";
+import {
+  setPlaybackRate,
+  setVolume,
+  switchPlaying,
+} from "../../model/store/videoPlayerSlice";
+import { secondsToTime } from "../../lib/secondsToTime";
 
 interface Props {
-  onPauseSwitch: () => void;
-  onChangeVolume: (val: number) => void;
-  onChangePlaybackRate: (val: number) => void;
-  onChangeSeekStart: () => void;
-  onChangeSeek: (val: number) => void;
-  onChangeSeekEnd: () => void;
-  seekValue: number;
-  seekMin: number;
-  seekMax: number;
-  videoDiration: string;
-  videoPlayed: string;
-  isPlaying: boolean;
-  reactPlayer: FilePlayer | null;
+  player: FilePlayer | null;
   ffmpeg: FFmpeg;
   videoFile: File;
   isConverterLoaded: boolean;
-  volume: number;
   onClickFullscreen: () => void;
 }
 
 export const Controls = ({
-  onPauseSwitch,
-  onChangeVolume,
-  onChangePlaybackRate,
-  onChangeSeekStart,
-  onChangeSeek,
-  onChangeSeekEnd,
-  seekValue,
-  seekMin,
-  seekMax,
-  videoDiration,
-  videoPlayed,
-  isPlaying,
-  reactPlayer,
+  player,
   ffmpeg,
   videoFile,
   isConverterLoaded,
-  volume,
   onClickFullscreen,
 }: Props) => {
-  const pauseRef = useRef<HTMLDivElement>(null);
-  const mainRef = useRef<HTMLDivElement>(null);
-  const [visibility, setVisibility] = useState<boolean>(false);
-  const timer = useRef<NodeJS.Timeout>(null);
+  const dispatch = useAppDispatch();
+  const { volume, playedSec, duration, isPlaying } = useAppSelector(
+    (state) => state.videoPlayer
+  );
 
-  //Клик по области видео меняет воспроизведение/паузу
-  const onClick = () => {
-    onPauseSwitch();
+  const pauseRef = useRef<HTMLDivElement>(null); //Объект, который ловит клики на видеоокно для остановки видео
+  const mainRef = useRef<HTMLDivElement>(null); //Объект, который ловит ивенты поинтера для работы интерфейса
+  const [visibility, setVisibility] = useState<boolean>(false); //Видимость интерфейса
+  const timer = useRef<NodeJS.Timeout>(null); //Таймер для интерфейса
+
+  const onPauseSwitch = () => {
+    dispatch(switchPlaying());
   };
+  //Меняем громкость
+  const onChangeVolume = (val: number) => {
+    dispatch(setVolume(val));
+    //setVolume(val);
+  };
+  //Меняем скорость воспроизведения
+  const onChangePlaybackRate = (val: number) => {
+    dispatch(setPlaybackRate(val));
+    //setPlaybackRate(val);
+  };
+
   //Движение мышки по области активирует видимость меню
   const onMouseMove = () => {
     setVisibility(true);
@@ -83,13 +79,13 @@ export const Controls = ({
     if (mRef != null) {
       mRef.addEventListener("mousemove", onMouseMove);
     }
-    if (pRef != null) pRef.addEventListener("click", onClick);
+    if (pRef != null) pRef.addEventListener("click", onPauseSwitch);
     return () => {
       if (timer.current) clearTimeout(timer.current);
       if (mRef != null) {
         mRef.removeEventListener("mousemove", onMouseMove);
       }
-      if (pRef != null) pRef.removeEventListener("click", onClick);
+      if (pRef != null) pRef.removeEventListener("click", onPauseSwitch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -151,17 +147,14 @@ export const Controls = ({
           </VStack>
           <VStack gap="0px" h={["30px", "45px"]} w="100%">
             <HStack w="100%" justifyContent={"space-between"}>
-              <Text fontSize={["xs", "lg", "lg"]}>{videoPlayed}</Text>
-              <Text fontSize={["xs", "lg", "lg"]}>{videoDiration}</Text>
+              <Text fontSize={["xs", "lg", "lg"]}>
+                {secondsToTime(playedSec)}
+              </Text>
+              <Text fontSize={["xs", "lg", "lg"]}>
+                {secondsToTime(duration)}
+              </Text>
             </HStack>
-            <PlaybackProgress
-              onChangeStart={onChangeSeekStart}
-              onChange={onChangeSeek}
-              onChangeEnd={onChangeSeekEnd}
-              value={seekValue}
-              min={seekMin}
-              max={seekMax}
-            />
+            <PlaybackProgress player={player} />
           </VStack>
           <HStack>
             <Button
@@ -179,14 +172,14 @@ export const Controls = ({
               {isPlaying ? <PauseIcon /> : <PlayIcon />}
             </Button>
             <Screenshoter
-              reactPlayer={reactPlayer}
+              reactPlayer={player}
               isVisible={!isPlaying && visibility}
             />{" "}
           </HStack>
         </HStack>
       </Box>
       {isConverterLoaded && visibility ? (
-        <VideoCompressor ffmpegRef={ffmpeg} videoFile={videoFile} />
+        <VideoCompressor ffmpeg={ffmpeg} videoFile={videoFile} />
       ) : null}
       <Box position="absolute" ref={pauseRef} w="100%" h="80%" />
       {/* По сути полотно для остановки видео */}

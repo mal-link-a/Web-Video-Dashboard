@@ -11,14 +11,14 @@ import {
 } from "@chakra-ui/react";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { useState } from "react";
-import { compressFormats } from "../../../../VideoPlayer/model/compressFormats";
+import { compressFormats } from "../../model/compressFormats";
 
 interface Props {
-  ffmpegRef: FFmpeg;
+  ffmpeg: FFmpeg;
   videoFile: File | null;
 }
 
-export const VideoCompressor = ({ ffmpegRef, videoFile }: Props) => {
+export const VideoCompressor = ({ ffmpeg, videoFile }: Props) => {
   const [convProgress, setProgress] = useState<number>(0);
   const [progressMsg, setProgressMsg] = useState<string>("");
   const [isCompressing, setCompressing] = useState<boolean>(false);
@@ -30,11 +30,9 @@ export const VideoCompressor = ({ ffmpegRef, videoFile }: Props) => {
     const customFormatting =
       e.currentTarget.getAttribute("data-customformatting") === "true";
     const codecLib = e.currentTarget.getAttribute("data-codeclib");
-    console.log(codecLib);
-
     if (videoFile != null) {
       await compressVideo(
-        ffmpegRef,
+        ffmpeg,
         videoFile,
         format,
         "output",
@@ -46,7 +44,7 @@ export const VideoCompressor = ({ ffmpegRef, videoFile }: Props) => {
 
   //Слушатель на время загрузки файла
   //В документации указано, что прогресс - экспериментальная функция, и на самом деле она показывает время неправильно
-  ffmpegRef.on("progress", ({ progress }) => {
+  ffmpeg.on("progress", ({ progress }) => {
     setProgress(progress);
     if (progress < 1) {
       setProgressMsg(`${Math.floor(progress * 10000) / 100}%`);
