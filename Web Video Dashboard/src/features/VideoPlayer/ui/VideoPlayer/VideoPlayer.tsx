@@ -8,7 +8,6 @@ import { Controls } from "../Controls/Controls";
 import { useToast } from "@chakra-ui/react";
 import { DownloadIcon } from "@/shared/components/Icons/DownloadIcon";
 import screenfull from "screenfull";
-
 import { useAppSelector, useAppDispatch } from "@/app/store/hooks";
 import {
   minusVolume,
@@ -19,13 +18,13 @@ import {
   setVideoPlayed,
   switchPlaying,
 } from "../../model/store/videoPlayerSlice";
-
 //Документация React Player https://www.npmjs.com/package/react-player
 //Документация capture-video-frame https://www.npmjs.com/package/capture-video-frame
 //Документация Chakra UI v2 https://v2.chakra-ui.com/
 //Документация ffmpeg.wasm https://github.com/ffmpegwasm/ffmpeg.wasm
 //Документация Ffmpeg https://www.ffmpeg.org/ffmpeg.html
 //Документация screenfull https://www.npmjs.com/package/screenfull
+//Документация Redux Toolkit https://redux-toolkit.js.org/
 //Захват скриншота https://github.com/CookPete/react-player/issues/341
 
 //FFMPEG.wasm на Vite не работает без правки конфига Vite https://github.com/ffmpegwasm/ffmpeg.wasm/issues/532#issuecomment-1676237863
@@ -38,7 +37,6 @@ export const VideoPlayer = () => {
   const { volume, playbackRate, duration, isPlaying } = useAppSelector(
     (state) => state.videoPlayer
   );
-
   const dispatch = useAppDispatch();
 
   const fulscreenRef = useRef<HTMLDivElement>(null); //Итем для показа в полноэкранном режиме
@@ -48,15 +46,6 @@ export const VideoPlayer = () => {
   const player = useRef<ReactPlayer>(null); //Проигрыватель
   const toast = useToast(); //Всплывающее окно. Используем на обработку ошибок
   const videoFile = useRef<File | null>(null); //Реф текущего выюранного видеофайла
-
-  // const [volume, setVolume] = useState<number>(1); //Громкость
-  // const [playbackRate, setPlaybackRate] = useState<number>(1); //Скорость воспроизведения
-
-  // const [duration, setDuration] = useState<number>(0); //Длительность видео в секундах
-  //Стартовая точка для слайдера воспроизведения видео. Мы обрезаем видео на пяти минутах, поэтому она нужна.
-  // const [startPlaybackPoint, setStartPlaybactPoint] = useState<number>(0);
-  // const [isPlaying, setPlaying] = useState<boolean>(false); // Воспроизведение/пауза
-
   //Инициируем FFMPEG.wasm
   useEffect(() => {
     const loadConverter = async () => {
@@ -67,6 +56,7 @@ export const VideoPlayer = () => {
         //Обрабатываем
         //Показываем всплывающее окно об ошибке.
         toast({
+          position: "top",
           title: `Не удалось запустить FFMPEG.wasm. Компрессия видео будет недоступна`,
           status: "error",
           isClosable: true,
@@ -85,17 +75,15 @@ export const VideoPlayer = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  //Простенькие элементы управления с клавиатуры
+  //Простенькие способы управления с клавиатуры
   const onKeyDown = (e: KeyboardEvent) => {
     const key = e.key;
     if (key === " ") {
       onPauseSwitch();
     } else if (key === "+") {
       dispatch(plusVolume());
-      //setVolume((prev) => Math.min(1, prev + 0.05));
     } else if (key === "-") {
       dispatch(minusVolume());
-      //setVolume((prev) => Math.max(0, prev - 0.05));
     }
   };
 
@@ -103,7 +91,6 @@ export const VideoPlayer = () => {
   const onVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setVideoFilePath(URL.createObjectURL(event.target.files[0]));
-      //dispatch(setVideoFile(event.target.files[0]));
       videoFile.current = event.target.files[0];
     }
   };
@@ -111,7 +98,6 @@ export const VideoPlayer = () => {
   //Воспроизведение/Пауза
   const onPauseSwitch = () => {
     dispatch(switchPlaying());
-    //setPlaying((prev) => !prev);
   };
 
   const onClickFullscreen = () => {
@@ -129,13 +115,13 @@ export const VideoPlayer = () => {
       const startPoint = val - 300;
       dispatch(setStartPoint(startPoint));
       toast({
+        position: "top",
         title: `Будут показаны последние 5 минут видеофайла`,
         status: "info",
         isClosable: true,
       });
     }
     dispatch(setDuration(val));
-    setDuration(val);
     dispatch(setPlaying(true));
   };
   //cb плеера вызывается, когда начинает играть медиа

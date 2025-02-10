@@ -27,6 +27,7 @@ interface Props {
   onClickFullscreen: () => void;
 }
 
+//Интерфейс управления видео
 export const Controls = ({
   player,
   ffmpeg,
@@ -44,6 +45,7 @@ export const Controls = ({
   const [visibility, setVisibility] = useState<boolean>(false); //Видимость интерфейса
   const timer = useRef<NodeJS.Timeout>(null); //Таймер для интерфейса
 
+  //Ставим видео на паузу
   const onPauseSwitch = () => {
     dispatch(switchPlaying());
   };
